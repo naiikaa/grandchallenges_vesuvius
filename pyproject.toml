@@ -1,11 +1,15 @@
 [project]
-name = "vesuvius_np"
+name = "vesuvius_gcml"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "imageio>=2.37.0",
+    "lightning>=2.5.1.post0",
     "matplotlib>=3.10.1",
+    "torch>=2.7.0",
+    "tqdm>=4.67.1",
     "vesuvius>=0.1.10",
 ]
 
