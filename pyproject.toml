@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "denoising-diffusion-pytorch>=2.1.1",
     "imageio>=2.37.0",
     "lightning>=2.5.1.post0",
     "matplotlib>=3.10.1",
