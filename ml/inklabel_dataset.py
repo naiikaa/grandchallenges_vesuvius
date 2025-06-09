@@ -56,7 +56,13 @@ class InkLabelDataset(torch.utils.data.Dataset):
     def create_samples_from_ink_labels(self, ink_labels):
         with mp.Pool(mp.cpu_count()) as pool:
             samples = list(pool.map(self.create_sample_from_ink_label, ink_labels))
-        return [sample for sample in samples if sample is not None]
+            samples = [sample for sample in samples if sample is not None]
+            # downsample the samples
+            samples = self.downsample_samples(samples)
+            samples = self.min_max_normalize_samples(samples)
+        return samples
+            
+
     
     def create_sample_from_ink_label(self, ink_label):
         samples = []
@@ -69,3 +75,21 @@ class InkLabelDataset(torch.utils.data.Dataset):
         
         return samples
         
+    def downsample_samples(self, samples, target_size=(128, 128)):
+        downsampled = []
+        for sample in samples:
+            downsampled_sample = torch.nn.functional.interpolate(
+                torch.tensor(sample).unsqueeze(0).unsqueeze(0).float(),
+                size=target_size,
+                mode='bilinear',
+                align_corners=False
+            ).squeeze().numpy()
+            downsampled.append(downsampled_sample)
+        return downsampled
+    
+    def min_max_normalize_samples(self,samples):
+        samples = np.array(samples)
+        min_val = samples.min(axis=(1, 2), keepdims=True)
+        max_val = samples.max(axis=(1, 2), keepdims=True)
+        normalized_samples = (samples - min_val) / (max_val - min_val)
+        return normalized_samples
