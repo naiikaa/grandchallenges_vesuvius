@@ -175,3 +175,7 @@ cython_debug/
 
 lightning_logs/
 *.gif
+*.pth
+*.png
+*.err
+*.log

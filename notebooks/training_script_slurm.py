@@ -11,22 +11,23 @@ import numpy as np
 segment_ids = yaml.safe_load(open('../configs/segment_ids.yaml', 'r'))
 print(segment_ids['segment_ids'])
 
-SAMPLE_SIZE = 512
+SAMPLE_SIZE = 1024
+DOWNSAMPLED_SIZE = 128
 
 ink_label_dataset = InkLabelDataset(segment_ids['segment_ids']['segments'],SAMPLE_SIZE)
-ink_label_dataloader = torch.utils.data.DataLoader(ink_label_dataset, batch_size=64, shuffle=True, num_workers=25)
+ink_label_dataloader = torch.utils.data.DataLoader(ink_label_dataset, batch_size=16, shuffle=True, num_workers=25)
 
 model = Unet(
-    dim = 32,
+    dim = 64,
     channels= 1,
-    dim_mults = (1, 2, 4),
-    flash_attn = False
+    dim_mults = (1, 2, 4, 8),
+    flash_attn = True
 )
 
 diffusion = GaussianDiffusion(
     model,
-    image_size = SAMPLE_SIZE,
-    
+    image_size = DOWNSAMPLED_SIZE,
+
     timesteps = 1000  
 )
 
@@ -43,6 +44,10 @@ class LightningWrapper(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x = batch
+        # downsample batch to bx128x128
+        x = torch.nn.functional.interpolate(x.unsqueeze(1), size=(128, 128), mode='bilinear', align_corners=False)
+        # normalize to [0, 1]
+        x = (x - x.min()) / (x.max() - x.min())
         pred = self(x)
         loss = torch.nn.functional.mse_loss(pred, x)
         self.log('train_loss', loss)
