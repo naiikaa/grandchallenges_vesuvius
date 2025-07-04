@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import lightning as pl
+import numpy as np
 
 class SelfAttention(pl.LightningModule):
     def __init__(self, channels):
@@ -31,31 +32,33 @@ class SelfAttention(pl.LightningModule):
 class AEA_lightning(pl.LightningModule):
     def __init__(self, lr = 3e-4):
         super().__init__()
+        
         self.lr = lr
-        self.criterion = nn.BCEWithLogitsLoss()
-        self.aggregator = nn.Conv3d(1,32,kernel_size=(3,1,1),padding=(1,0,0))
+        self.criterion = nn.MSELoss()
+        #self.aggregator = nn.Conv3d(1,16,kernel_size=(3,1,1),padding=(1,0,0))
         
         self.encoder = nn.Sequential(
+            nn.Conv2d(16, 32, 3, stride=2, padding=1),
+            SelfAttention(32),
+            nn.LeakyReLU(),
             nn.Conv2d(32, 64, 3, stride=2, padding=1),
             SelfAttention(64),
             nn.LeakyReLU(),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),
-            SelfAttention(128),
-            nn.LeakyReLU(),
-            nn.Conv2d(128, 256, 7),
+            nn.Conv2d(64, 128, 7),
             nn.LeakyReLU(),
         )
 
-        self.attention = SelfAttention(256)
+        self.attention = SelfAttention(128)
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 7),
-            SelfAttention(128),
-            nn.LeakyReLU(),
-            nn.ConvTranspose2d(128, 64, 3,stride=2, padding=1,output_padding=1),
+            nn.ConvTranspose2d(128, 64, 7),
             SelfAttention(64),
             nn.LeakyReLU(),
-            nn.ConvTranspose2d(64, 1, 3, stride=2, padding=1,output_padding=1),
+            nn.ConvTranspose2d(64, 32, 3,stride=2, padding=1,output_padding=1),
+            SelfAttention(32),
+            nn.LeakyReLU(),
+            nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1,output_padding=1),
+            nn.Sigmoid()
         )
 
     def saveModel(self, model, path):
@@ -68,17 +71,20 @@ class AEA_lightning(pl.LightningModule):
         torch.save(model.state_dict(), path)
 
     def forward(self,x):
-        x, _ = torch.max(self.aggregator(x), dim=2)
+        #x, _ = torch.max(self.aggregator(x), dim=2)
         h = self.encoder(x)
         z = self.attention(h)
         x_hat = self.decoder(z)
         return x_hat
 
     def training_step(self, batch):
-        batch_tiles, batch_labels, _ = batch
-        pred = self(batch_tiles)
-        target = batch_labels.float()
-        loss = self.criterion(pred, target)
+        pergament = batch['scroll_segment'].float().unsqueeze(1)
+        pergament = nn.BatchNorm3d(1,device='cuda')(pergament)
+        
+        ink_label = batch['ink_label'].float()
+        ink_label = nn.BatchNorm2d(1,device='cuda')(ink_label.unsqueeze(1))
+        pred = self(pergament.squeeze())
+        loss = self.criterion(pred.squeeze(), ink_label.squeeze())
         
         self.log('train_loss', loss)
         return loss

@@ -82,19 +82,29 @@ class InkLabelDataset(torch.utils.data.Dataset):
         for i in range(0, h - self.sample_size + 1, self.sample_size):
             for j in range(0, w - self.sample_size + 1, self.sample_size):
                 ink_label_sample = ink_label[i:i + self.sample_size, j:j + self.sample_size]
-                pergament_sample = pergament[:,i:i + self.sample_size, j:j + self.sample_size]
-                if ink_label_sample.max() > 0 and ink_label_sample.shape[0] == self.sample_size and ink_label_sample.shape[1] == self.sample_size:
-                    samples[f'{self.sample_count}'] = {'ink_label': torch.tensor(np.array(ink_label_sample)), 'scroll_segment': torch.tensor(np.array(pergament_sample)), 'segment_id': item['segment_id']}
+                if self.check_sample(ink_label_sample):
+                    pergament_sample = pergament[:,i:i + self.sample_size, j:j + self.sample_size]
+                    samples[f'{self.sample_count}'] = {'ink_label': ink_label_sample, 'scroll_segment': pergament_sample, 'segment_id': item['segment_id']}
                     self.sample_count += 1
                     
         print(f"Created {len(samples)} samples from ink label with shapes {ink_label.shape}, {pergament.shape} for segment {item['segment_id']}")
         
         return samples
     
+    def check_sample(self, ink_label):
+        # checking if 70-80% of the pixels in the ink label are non-zero
+        non_zero_pixels = np.count_nonzero(ink_label)
+        total_pixels = self.sample_size*self.sample_size
+        if non_zero_pixels / total_pixels < 0.8 and non_zero_pixels / total_pixels > 0.2:
+            return True
+        return False
+    
+    
+    
     def __test__(self):
         # Test the dataset
         print(f"Dataset length: {len(self)}")
-        fig , axes = plt.subplots(2, 5, figsize=(10, 25))
+        fig , axes = plt.subplots(2, 5)
         for i in range(5):
             sample = self[i]
             print(f"Sample {i}: ink_label shape {sample['ink_label'].shape}, scroll_segment shape {sample['scroll_segment'].shape}")
