@@ -3,37 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def one_param(m):
-    "get model first parameter"
-    return next(iter(m.parameters()))
-
-class EMA:
-    def __init__(self, beta):
-        super().__init__()
-        self.beta = beta
-        self.step = 0
-
-    def update_model_average(self, ma_model, current_model):
-        for current_params, ma_params in zip(current_model.parameters(), ma_model.parameters()):
-            old_weight, up_weight = ma_params.data, current_params.data
-            ma_params.data = self.update_average(old_weight, up_weight)
-
-    def update_average(self, old, new):
-        if old is None:
-            return new
-        return old * self.beta + (1 - self.beta) * new
-
-    def step_ema(self, ema_model, model, step_start_ema=2000):
-        if self.step < step_start_ema:
-            self.reset_parameters(ema_model, model)
-            self.step += 1
-            return
-        self.update_model_average(ema_model, model)
-        self.step += 1
-
-    def reset_parameters(self, ema_model, model):
-        ema_model.load_state_dict(model.state_dict())
-
 
 class SelfAttention(nn.Module):
     def __init__(self, channels):
@@ -129,7 +98,7 @@ class Up(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, remove_deep_conv=False):
+    def __init__(self, c_in=3, c_out=3, time_dim=256, remove_deep_conv=True, encoder=None):
         super().__init__()
         self.time_dim = time_dim
         self.remove_deep_conv = remove_deep_conv
@@ -161,7 +130,7 @@ class UNet(nn.Module):
     def pos_encoding(self, t, channels):
         inv_freq = 1.0 / (
             10000
-            ** (torch.arange(0, channels, 2, device=one_param(self).device).float() / channels)
+            ** (torch.arange(0, channels, 2, device="cuda").float() / channels)
         )
         pos_enc_a = torch.sin(t.repeat(1, channels // 2) * inv_freq)
         pos_enc_b = torch.cos(t.repeat(1, channels // 2) * inv_freq)
@@ -198,16 +167,16 @@ class UNet(nn.Module):
 
 
 class UNet_conditional(UNet):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, num_classes=None, **kwargs):
+    def __init__(self, c_in=3, c_out=3, time_dim=256, encoder=None, **kwargs):
         super().__init__(c_in, c_out, time_dim, **kwargs)
-        if num_classes is not None:
-            self.label_emb = nn.Embedding(num_classes, time_dim)
+        if encoder is not None:
+            self.encoder = encoder
 
     def forward(self, x, t, y=None):
         t = t.unsqueeze(-1)
         t = self.pos_encoding(t, self.time_dim)
 
         if y is not None:
-            t += self.label_emb(y)
+            t += self.encoder(y)
 
         return self.unet_forwad(x, t)
