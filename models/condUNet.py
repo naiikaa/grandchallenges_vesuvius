@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import lightning as lt
 
 class SelfAttention(nn.Module):
     def __init__(self, channels):
@@ -49,7 +49,7 @@ class DoubleConv(nn.Module):
 
 
 class Down(nn.Module):
-    def __init__(self, in_channels, out_channels, emb_dim=256):
+    def __init__(self, in_channels, out_channels, emb_dim=1024):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
@@ -72,7 +72,7 @@ class Down(nn.Module):
 
 
 class Up(nn.Module):
-    def __init__(self, in_channels, out_channels, emb_dim=256):
+    def __init__(self, in_channels, out_channels, emb_dim=1024):
         super().__init__()
 
         self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
@@ -97,9 +97,9 @@ class Up(nn.Module):
         return x + emb
 
 
-class UNet(nn.Module):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, remove_deep_conv=True, encoder=None):
-        super().__init__()
+class UNet(lt.LightningModule):
+    def __init__(self, c_in=3, c_out=3, time_dim=1024, remove_deep_conv=True,**kwargs):
+        super().__init__(**kwargs)
         self.time_dim = time_dim
         self.remove_deep_conv = remove_deep_conv
         self.inc = DoubleConv(c_in, 64)
@@ -130,8 +130,8 @@ class UNet(nn.Module):
     def pos_encoding(self, t, channels):
         inv_freq = 1.0 / (
             10000
-            ** (torch.arange(0, channels, 2, device="cuda").float() / channels)
-        )
+            ** (torch.arange(0, channels, 2).float() / channels)
+        ).cuda()
         pos_enc_a = torch.sin(t.repeat(1, channels // 2) * inv_freq)
         pos_enc_b = torch.cos(t.repeat(1, channels // 2) * inv_freq)
         pos_enc = torch.cat([pos_enc_a, pos_enc_b], dim=-1)
@@ -167,16 +167,16 @@ class UNet(nn.Module):
 
 
 class UNet_conditional(UNet):
-    def __init__(self, c_in=3, c_out=3, time_dim=256, encoder=None, **kwargs):
+    def __init__(self, c_in=3, c_out=3, time_dim=1024, encoder=None,attention=None, **kwargs):
         super().__init__(c_in, c_out, time_dim, **kwargs)
         if encoder is not None:
-            self.encoder = encoder
+            self.encoder = encoder.cuda()
+        if attention is not None:
+            self.attention = attention.cuda()
 
     def forward(self, x, t, y=None):
-        t = t.unsqueeze(-1)
+        t = t.unsqueeze(-1).cuda()
         t = self.pos_encoding(t, self.time_dim)
-
         if y is not None:
-            t += self.encoder(y)
-
+            t += self.attention(self.encoder(y.cuda())).view(-1,self.time_dim).cuda()
         return self.unet_forwad(x, t)

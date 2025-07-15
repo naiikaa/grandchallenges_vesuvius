@@ -35,18 +35,33 @@ class AE(pl.LightningModule):
         super().__init__(*args, **kwargs)
         
         self.encoder = nn.Sequential(
-            nn.Conv2d(16, 128, 2, stride=2, padding=0),
+            nn.Conv2d(16, 32, 2, stride=2, padding=0),
+            SelfAttention(32),
             nn.LeakyReLU(),
-            nn.Conv2d(128, 256,1),
+            nn.Conv2d(32, 64,2,2),
+            SelfAttention(64),
             nn.LeakyReLU(),
+            nn.Conv2d(64, 64,2,2),
+            SelfAttention(64),
+            nn.LeakyReLU(),
+            #nn.Conv2d(64, 64,2,2),
+            #SelfAttention(64),
+            #nn.LeakyReLU(),
         )
         
-        self.attention = SelfAttention(256)
+        self.attention = SelfAttention(64)
         
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128,1),
+            #nn.ConvTranspose2d(64, 64,2,2),
+            #SelfAttention(64),
+            #nn.LeakyReLU(),
+            nn.ConvTranspose2d(64, 64,2,2),
+            SelfAttention(64),
             nn.LeakyReLU(),
-            nn.ConvTranspose2d(128, 16, 2, stride=2, padding=0),
+            nn.ConvTranspose2d(64, 32,2,2),
+            SelfAttention(32),
+            nn.LeakyReLU(),
+            nn.ConvTranspose2d(32, 16, 2, stride=2, padding=0),
         )
         
         self.criterion = nn.MSELoss()
@@ -66,6 +81,7 @@ class AE(pl.LightningModule):
         z = self.attention(h)
         x_hat = self.decoder(z)
         return x_hat
+    
 
     def training_step(self, batch):
         pergament = batch['scroll_segment'].float().unsqueeze(1)
@@ -75,6 +91,26 @@ class AE(pl.LightningModule):
         loss = self.criterion(pred.squeeze(), pergament.squeeze())
         
         self.log('train_loss', loss)
+        return loss
+    
+    def test_step(self, batch):
+        pergament = batch['scroll_segment'].float().unsqueeze(1)
+        pergament = nn.BatchNorm3d(1,device='cuda')(pergament)
+        
+        pred = self(pergament.squeeze())
+        loss = self.criterion(pred.squeeze(), pergament.squeeze())
+        
+        self.log('test_loss', loss)
+        return loss
+    
+    def validation_step(self, batch):
+        pergament = batch['scroll_segment'].float().unsqueeze(1)
+        pergament = nn.BatchNorm3d(1,device='cuda')(pergament)
+        
+        pred = self(pergament.squeeze())
+        loss = self.criterion(pred.squeeze(), pergament.squeeze())
+        
+        self.log('val_loss', loss)
         return loss
 
     def configure_optimizers(self):
