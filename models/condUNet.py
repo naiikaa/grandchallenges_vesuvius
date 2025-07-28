@@ -178,5 +178,9 @@ class UNet_conditional(UNet):
         t = t.unsqueeze(-1).cuda()
         t = self.pos_encoding(t, self.time_dim)
         if y is not None:
-            t += self.attention(self.encoder(y.cuda())).view(-1,self.time_dim).cuda()
+            if self.encoder is not None:
+                y = self.encoder(y.cuda())
+            if self.attention is not None:
+                y = self.attention(y.cuda())
+            t = t + y.view(-1, self.time_dim).cuda()
         return self.unet_forwad(x, t)
