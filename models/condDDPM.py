@@ -23,7 +23,7 @@ class Diffusion(lt.LightningModule):
         self.alpha_hat = torch.cumprod(self.alpha, dim=0).cuda()
 
         self.img_size = img_size
-        self.model = UNet_conditional(c_in, c_out,encoder=encoder,attention=attention)
+        self.model = UNet_conditional(c_in, c_out,self.img_size,encoder=encoder,attention=attention)
         self.ema_model = copy.deepcopy(self.model).eval().requires_grad_(False)
         self.c_in = c_in
         

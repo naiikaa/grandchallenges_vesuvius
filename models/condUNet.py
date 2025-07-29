@@ -49,7 +49,7 @@ class DoubleConv(nn.Module):
 
 
 class Down(nn.Module):
-    def __init__(self, in_channels, out_channels, emb_dim=1024):
+    def __init__(self, in_channels, out_channels, emb_dim=32):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
@@ -72,7 +72,7 @@ class Down(nn.Module):
 
 
 class Up(nn.Module):
-    def __init__(self, in_channels, out_channels, emb_dim=1024):
+    def __init__(self, in_channels, out_channels, emb_dim=32):
         super().__init__()
 
         self.up = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
@@ -98,16 +98,16 @@ class Up(nn.Module):
 
 
 class UNet(lt.LightningModule):
-    def __init__(self, c_in=3, c_out=3, time_dim=1024, remove_deep_conv=True,**kwargs):
+    def __init__(self, c_in=3, c_out=3, time_dim=32, remove_deep_conv=True,**kwargs):
         super().__init__(**kwargs)
         self.time_dim = time_dim
         self.remove_deep_conv = remove_deep_conv
         self.inc = DoubleConv(c_in, 64)
-        self.down1 = Down(64, 128)
+        self.down1 = Down(64, 128, emb_dim=time_dim)
         self.sa1 = SelfAttention(128)
-        self.down2 = Down(128, 256)
+        self.down2 = Down(128, 256, emb_dim=time_dim)
         self.sa2 = SelfAttention(256)
-        self.down3 = Down(256, 256)
+        self.down3 = Down(256, 256, emb_dim=time_dim)
         self.sa3 = SelfAttention(256)
 
 
@@ -119,11 +119,11 @@ class UNet(lt.LightningModule):
             self.bot2 = DoubleConv(512, 512)
             self.bot3 = DoubleConv(512, 256)
 
-        self.up1 = Up(512, 128)
+        self.up1 = Up(512, 128, emb_dim=time_dim)
         self.sa4 = SelfAttention(128)
-        self.up2 = Up(256, 64)
+        self.up2 = Up(256, 64, emb_dim=time_dim)
         self.sa5 = SelfAttention(64)
-        self.up3 = Up(128, 64)
+        self.up3 = Up(128, 64, emb_dim=time_dim)
         self.sa6 = SelfAttention(64)
         self.outc = nn.Conv2d(64, c_out, kernel_size=1)
 
@@ -167,12 +167,17 @@ class UNet(lt.LightningModule):
 
 
 class UNet_conditional(UNet):
-    def __init__(self, c_in=3, c_out=3, time_dim=1024, encoder=None,attention=None, **kwargs):
+    def __init__(self, c_in=3, c_out=3, time_dim=32, encoder=None,attention=None, **kwargs):
         super().__init__(c_in, c_out, time_dim, **kwargs)
         if encoder is not None:
             self.encoder = encoder.cuda()
+        else:
+            self.encoder = None
+        
         if attention is not None:
             self.attention = attention.cuda()
+        else:
+            self.attention = None
 
     def forward(self, x, t, y=None):
         t = t.unsqueeze(-1).cuda()
@@ -182,5 +187,6 @@ class UNet_conditional(UNet):
                 y = self.encoder(y.cuda())
             if self.attention is not None:
                 y = self.attention(y.cuda())
-            t = t + y.view(-1, self.time_dim).cuda()
+            
+            t = t + torch.sum(torch.sum(y,dim=1).squeeze(),dim=2).cuda()
         return self.unet_forwad(x, t)
