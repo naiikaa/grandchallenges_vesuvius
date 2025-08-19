@@ -2,7 +2,8 @@ import numpy as np
 import multiprocessing as mp
 from tqdm import tqdm
 def matching_pixels(y_true, y_pred):
-    return np.sum(y_true == y_pred).item()
+    
+    return (abs(y_true.squeeze() - y_pred.squeeze())>255/10).sum()
 
 def matching_pixels_bridge(combined):
     y_true, y_pred = combined

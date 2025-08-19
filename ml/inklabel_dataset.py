@@ -8,11 +8,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class InkLabelDataset(torch.utils.data.Dataset):
-    def __init__(self, segment_ids,sample_size=1024):
+    def __init__(self, segment_ids,sample_size=1024, volume_depth = 16 ,upper_bound=0.8, lower_bound=0.2):
         assert isinstance(segment_ids, list), f"segment_ids must be a list is {type(segment_ids)} instead"
         assert len(segment_ids) > 0, f"segment_ids list cannot be empty has length {len(segment_ids)}"
 
         self.sample_size = sample_size
+        self.upper_bound = upper_bound
+        self.lower_bound = lower_bound
+        self.volume_depth = volume_depth
         self.sample_count = 0
         self.segment_ids = segment_ids
         
@@ -51,7 +54,7 @@ class InkLabelDataset(torch.utils.data.Dataset):
         try:
             volume = Volume(int(segment_id))
             inklabels = volume.inklabel
-            pergament = volume[26:42,:,:]
+            pergament = volume[:self.volume_depth,:,:]
         except Exception as e:
             print(f"Error processing segment {segment_id}: {e}")
             self.segment_ids.remove(segment_id)
@@ -92,10 +95,9 @@ class InkLabelDataset(torch.utils.data.Dataset):
         return samples
     
     def check_sample(self, ink_label):
-        # checking if 70-80% of the pixels in the ink label are non-zero
-        non_zero_pixels = np.count_nonzero(ink_label)
+        non_pixels = (ink_label > 100).sum().item()
         total_pixels = self.sample_size*self.sample_size
-        if non_zero_pixels / total_pixels < 0.8 and non_zero_pixels / total_pixels > 0.2:
+        if non_pixels / total_pixels < self.upper_bound and non_pixels / total_pixels > self.lower_bound:
             return True
         return False
     
