@@ -1,18 +1,14 @@
-import argparse, logging, copy
-from types import SimpleNamespace
-from contextlib import nullcontext
 import os
 import torch
 from torch import optim
 import torch.nn as nn
-import numpy as np
 from models.condUNet import UNet_conditional
 import lightning as lt
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 
 class Diffusion(lt.LightningModule):
-    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02, img_size=32, c_in=1, c_out=1,encoder=None,attention=None, *args, **kwargs):
+    def __init__(self, noise_steps=1000, beta_start=1e-4, beta_end=0.02,volume_depth=16, img_size=256, c_in=1, c_out=1,encoder=None,attention=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.noise_steps = noise_steps
         self.beta_start = beta_start
@@ -22,10 +18,12 @@ class Diffusion(lt.LightningModule):
         self.alpha = 1. - self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0).cuda()
 
+        self.volume_depth = volume_depth
         self.img_size = img_size
-        self.model = UNet_conditional(c_in, c_out,self.img_size,encoder=encoder,attention=attention)
-        self.ema_model = copy.deepcopy(self.model).eval().requires_grad_(False)
+        self.model = UNet_conditional(c_in, c_out,img_size=self.img_size,volume_depth=self.volume_depth,time_dim=256,encoder=encoder,attention=attention)
+        self.ema_model = None
         self.c_in = c_in
+        self.c_out = c_out
         
         
 
@@ -57,12 +55,19 @@ class Diffusion(lt.LightningModule):
             x_t = (x_t.clamp(-1, 1) + 1) / 2
             x_t = (x_t * 255).type(torch.uint8)
             plt.subplot(1, 11, i // (self.noise_steps // 10) + 1)
-            plt.imshow(x_t[0].squeeze().cpu().numpy())
+            plt.imshow(x_t[0].squeeze().cpu().numpy(), cmap='gray')
             plt.title(f"t={i}")
             plt.axis('off')
         plt.tight_layout()
         plt.show()
-            
+        
+        #print uniques and their counts
+        unique, counts = torch.unique(x_t[0].squeeze(), return_counts=True)
+        print("Unique values and their counts:")
+        for u, c in zip(unique, counts):
+            print(f"Value: {u.item()}, Count: {c.item()}")
+        
+        
     
     @torch.inference_mode()
     def sample(self, use_ema, labels, cfg_scale=3):
@@ -93,6 +98,7 @@ class Diffusion(lt.LightningModule):
 
     def training_step(self, batch):
         ink_labels = batch['ink_label'].float().unsqueeze(1).cuda()
+        ink_labels = nn.BatchNorm2d(1,device='cuda')(ink_labels)
         pergament = batch['scroll_segment'].float().unsqueeze(1).cuda()
         pergament = nn.BatchNorm3d(1,device='cuda')(pergament)
         t = self.sample_timesteps(len(ink_labels))
@@ -104,6 +110,7 @@ class Diffusion(lt.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         ink_labels = batch['ink_label'].float().unsqueeze(1).cuda()
+        ink_labels = nn.BatchNorm2d(1,device='cuda')(ink_labels)
         pergament = batch['scroll_segment'].float().unsqueeze(1).cuda()
         pergament = nn.BatchNorm3d(1,device='cuda')(pergament)
         t = self.sample_timesteps(len(ink_labels))
@@ -115,6 +122,7 @@ class Diffusion(lt.LightningModule):
     
     def test_step(self, batch, batch_idx):
         ink_labels = batch['ink_label'].float().unsqueeze(1).cuda()
+        ink_labels = nn.BatchNorm2d(1,device='cuda')(ink_labels)
         pergament = batch['scroll_segment'].float().unsqueeze(1).cuda()
         pergament = nn.BatchNorm3d(1,device='cuda')(pergament)
         t = self.sample_timesteps(len(ink_labels))
@@ -130,12 +138,10 @@ class Diffusion(lt.LightningModule):
 
     def load(self, model_cpkt_path, model_ckpt="ckpt.pt", ema_model_ckpt="ema_ckpt.pt"):
         self.model.load_state_dict(torch.load(os.path.join(model_cpkt_path, model_ckpt)))
-        self.ema_model.load_state_dict(torch.load(os.path.join(model_cpkt_path, ema_model_ckpt)))
 
     def save(self, model_cpkt_path, model_ckpt="ckpt.pt", ema_model_ckpt="ema_ckpt.pt"):
         os.makedirs(model_cpkt_path, exist_ok=True)
         torch.save(self.model.state_dict(), os.path.join(model_cpkt_path, model_ckpt))
-        torch.save(self.ema_model.state_dict(), os.path.join(model_cpkt_path, ema_model_ckpt))
     
     def __test__(self):
         scroll_segments = torch.rand(1,16,32,32).to(self.device)
