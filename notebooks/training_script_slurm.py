@@ -10,7 +10,7 @@ import numpy as np
 import torch.nn as nn
 
 segment_ids = yaml.safe_load(open('../configs/segment_ids.yaml', 'r'))
-segments = [segment_ids['segment_ids']['segments'][0],segment_ids['segment_ids']['segments'][1]]
+segments = [segment_ids['segment_ids']['segments'][0]]
 
 SAMPLE_SIZE = 16
 

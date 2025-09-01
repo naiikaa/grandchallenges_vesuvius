@@ -9,7 +9,7 @@ from models.condDDPM import Diffusion
 import argparse
 import os
 from ml import matching_pixels, matching_pixels_subset_max
-
+            
 parser  = argparse.ArgumentParser(description="Train a conditional DDPM model with ink labels.")
 parser.add_argument('--sample_size', type=int, default=16, help='Size of the samples to be used in training.')
 parser.add_argument('--volume_depth', type=int, default=16, help='Depth of the volume to be used in training.')
@@ -18,7 +18,7 @@ parser.add_argument('--lower_bound', type=float, default=0.4, help='Lower bound 
 args = parser.parse_args()
 
 segment_ids = yaml.safe_load(open('../configs/segment_ids.yaml', 'r'))
-segments = [segment_ids['segment_ids']['segments'][0],segment_ids['segment_ids']['segments'][1],segment_ids['segment_ids']['segments'][2]]
+segments = [segment_ids['segment_ids']['segments'][0]]
 
 
 dataset = InkLabelDataset(segment_ids=segment_ids['segment_ids']['segments'],sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth)
