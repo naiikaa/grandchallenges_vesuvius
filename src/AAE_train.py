@@ -21,7 +21,7 @@ segment_ids = yaml.safe_load(open('../configs/segment_ids.yaml', 'r'))
 segments = [segment_ids['segment_ids']['segments'][0]]
 
 
-dataset = InkLabelDataset(segment_ids=segment_ids['segment_ids']['segments'],sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth)
+dataset = InkLabelDataset(segment_ids=segments,sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth)
 train, test, val = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1])
 train_Loader = torch.utils.data.DataLoader(train, batch_size=64, shuffle=True,num_workers=27)
 test_Loader = torch.utils.data.DataLoader(test, batch_size=16, shuffle=False,num_workers=27)
@@ -33,6 +33,7 @@ ddpm = Diffusion(
     beta_start=1e-4,
     beta_end=0.03,
     img_size=args.sample_size,
+    volume_depth=args.volume_depth,
     c_in=1,
     c_out=1,
     encoder=None,
