@@ -9,6 +9,7 @@ from models.condDDPM import Diffusion
 import argparse
 import os
 from ml import matching_pixels, matching_pixels_subset_max
+import numpy as np
             
 parser  = argparse.ArgumentParser(description="Train a conditional DDPM model with ink labels.")
 parser.add_argument('--sample_size', type=int, default=16, help='Size of the samples to be used in training.')
@@ -82,7 +83,7 @@ plt.savefig(os.path.join(folder_name, 'realToSynth8.png'))
 
 # generate [5, 20, 100, 500, 2000, 10000] samples and check for the pixel score
 num_runs = 5
-num_samples = [5, 20, 100, 500, 2000, 10000]
+num_samples = [5, 20, 100, 500, 2000]
 results = {}
 for i in range(num_runs):
     for n in num_samples:
@@ -90,7 +91,7 @@ for i in range(num_runs):
         samples = ddpm.__test_after_training__(input_sample)
         
         matching_pixels_score = matching_pixels_subset_max(samples.cpu().numpy(), test_sample['ink_label'].squeeze().cpu().numpy()[0])
-        results['run_' + str(i) + '_samples_' + str(n)] = matching_pixels_score
+        results['run_' + str(i) + '_samples_' + str(n)] = matching_pixels_score.tolist()
     
 # save the results to a yaml file
 results_file = os.path.join(folder_name, 'results.yaml')

@@ -180,3 +180,4 @@ lightning_logs/
 *.png
 *.err
 *.log
+/src/experiments
