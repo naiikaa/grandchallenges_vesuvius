@@ -25,7 +25,7 @@ segments = [segment_ids['segment_ids']['segments'][0]]
 dataset = InkLabelDataset(segment_ids=segments,sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth)
 train, test, val = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1])
 train_Loader = torch.utils.data.DataLoader(train, batch_size=64, shuffle=True,num_workers=27)
-test_Loader = torch.utils.data.DataLoader(test, batch_size=16, shuffle=False,num_workers=27)
+test_Loader = torch.utils.data.DataLoader(test, batch_size=32, shuffle=True,num_workers=27)
 validation_Loader = torch.utils.data.DataLoader(val, batch_size=16, shuffle=False,num_workers=27)
 
 
@@ -82,21 +82,41 @@ for i in range(8):
 plt.savefig(os.path.join(folder_name, 'realToSynth8.png'))
 
 # generate [5, 20, 100, 500, 2000, 10000] samples and check for the pixel score
-num_runs = 5
-num_samples = [5, 20, 100, 500, 2000, 5000]
-results = {}
-for i in range(num_runs):
-    for n in num_samples:
-        input_sample = test_sample['scroll_segment'][0].repeat(n, 1, 1, 1).float().cuda()
-        samples = ddpm.__test_after_training__(input_sample)
+def multi_same_exp():
+    num_runs = 5
+    num_samples = [5, 20, 100, 500, 2000, 5000]
+    results = {}
+    for i in range(num_runs):
+        for n in num_samples:
+            input_sample = test_sample['scroll_segment'][0].repeat(n, 1, 1, 1).float().cuda()
+            samples = ddpm.__test_after_training__(input_sample)
+            
+            matching_pixels_score = matching_pixels_subset_max(samples.cpu().numpy(), test_sample['ink_label'].squeeze().cpu().numpy()[0])
+            results['run_' + str(i) + '_samples_' + str(n)] = matching_pixels_score.tolist()
         
-        matching_pixels_score = matching_pixels_subset_max(samples.cpu().numpy(), test_sample['ink_label'].squeeze().cpu().numpy()[0])
-        results['run_' + str(i) + '_samples_' + str(n)] = matching_pixels_score.tolist()
-    
-# save the results to a yaml file
-results_file = os.path.join(folder_name, 'results.yaml')
-with open(results_file, 'w') as f:
-    yaml.dump(results, f)
+    # save the results to a yaml file
+    results_file = os.path.join(folder_name, 'results.yaml')
+    with open(results_file, 'w') as f:
+        yaml.dump(results, f)
 
-
+def entire_test_loader_exp():
+    num_runs = 5
+    all_scores = {}
+    for i in range(num_runs):
+        for test_sample in test_Loader:
+            batch_scores = []
+            input_sample = test_sample['scroll_segment'].float().cuda()
+            samples = ddpm.__test_after_training__(input_sample)
+            for j in range(input_sample.shape[0]):
+                matching_pixels_score = matching_pixels(samples[j].cpu().numpy(), test_sample['ink_label'].squeeze().cpu().numpy()[j])
+                batch_scores.append(matching_pixels_score.tolist())
+            all_scores['run_' + str(i) + '_batch_' + str(len(all_scores))] = batch_scores
+                
+        # save the results to a yaml file
+        results_file = os.path.join(folder_name, 'entire_test_loader_run_' + str(i) + '.yaml')
+        with open(results_file, 'w') as f:
+            yaml.dump(all_scores, f)
+            
+entire_test_loader_exp()
+        
         
