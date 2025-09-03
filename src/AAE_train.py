@@ -83,7 +83,7 @@ plt.savefig(os.path.join(folder_name, 'realToSynth8.png'))
 
 # generate [5, 20, 100, 500, 2000, 10000] samples and check for the pixel score
 num_runs = 5
-num_samples = [5, 20, 100, 500, 2000]
+num_samples = [5, 20, 100, 500, 2000, 5000]
 results = {}
 for i in range(num_runs):
     for n in num_samples:

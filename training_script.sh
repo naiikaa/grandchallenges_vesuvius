@@ -1,5 +1,4 @@
 #!/bin/bash
-#SBATCH --job-name="condDDPM vesuvius experiment"
 #SBATCH --output=Log.log
 #SBATCH --error=Error.err
 #SBATCH --ntasks=1
@@ -14,6 +13,6 @@ sample_size=$1
 volume_depth=$2
 
 
-source ~/ies_env/bin/activate
+source ~/vesuvius/bin/activate
 cd /mnt/stud/home/npopkov/grandchallenges_vesuvius/src
 srun python AAE_train.py --sample_size $1 --volume_depth $2
