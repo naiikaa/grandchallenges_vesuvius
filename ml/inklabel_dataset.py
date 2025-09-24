@@ -79,7 +79,7 @@ class InkLabelDataset(torch.utils.data.Dataset):
     def create_sample_from_data(self, item):
         samples = {}
         ink_label = item['inklabel']
-        pergament = item['scrollsegment']
+        pergament = item['scroll_segment']
         h, w = ink_label.shape
         
         for i in range(0, h - self.sample_size + 1, self.sample_size):
