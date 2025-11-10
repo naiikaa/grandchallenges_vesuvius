@@ -12,10 +12,10 @@ from ml import matching_pixels, matching_pixels_subset_max
 import numpy as np
             
 parser  = argparse.ArgumentParser(description="Train a conditional DDPM model with ink labels.")
-parser.add_argument('--sample_size', type=int, default=16, help='Size of the samples to be used in training.')
-parser.add_argument('--volume_depth', type=int, default=16, help='Depth of the volume to be used in training.')
-parser.add_argument('--upper_bound', type=float, default=0.6, help='Upper bound for the ink label values.')
-parser.add_argument('--lower_bound', type=float, default=0.4, help='Lower bound for the ink label values.')
+parser.add_argument('--sample_size', type=int, default=32, help='Size of the samples to be used in training.')
+parser.add_argument('--volume_depth', type=int, default=8, help='Depth of the volume to be used in training.')
+parser.add_argument('--upper_bound', type=float, default=0.95, help='Upper bound for the ink label values.')
+parser.add_argument('--lower_bound', type=float, default=0.05, help='Lower bound for the ink label values.')
 args = parser.parse_args()
 
 segment_ids = yaml.safe_load(open('../configs/segment_ids.yaml', 'r'))

@@ -14,7 +14,7 @@ segments = [segment_ids['segment_ids']['segments'][0]]
 
 SAMPLE_SIZE = 16
 
-dataset = InkLabelDataset(segment_ids=segment_ids['segment_ids']['segments'],sample_size=SAMPLE_SIZE,upper_bound=.6, lower_bound=0.4)
+dataset = InkLabelDataset(segment_ids=segment_ids['segment_ids']['segments'],sample_size=SAMPLE_SIZE,upper_bound=.95, lower_bound=0.05)
 train, test, val = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1])
 train_Loader = torch.utils.data.DataLoader(train, batch_size=64, shuffle=True,num_workers=27)
 test_Loader = torch.utils.data.DataLoader(test, batch_size=16, shuffle=False,num_workers=27)

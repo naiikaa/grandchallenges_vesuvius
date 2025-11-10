@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class InkLabelDataset(torch.utils.data.Dataset):
-    def __init__(self, segment_ids,sample_size=1024, volume_depth = 16 ,upper_bound=0.8, lower_bound=0.2):
+    def __init__(self, segment_ids,sample_size=1024, volume_depth = 16 ,upper_bound=0.95, lower_bound=0.05):
         assert isinstance(segment_ids, list), f"segment_ids must be a list is {type(segment_ids)} instead"
         assert len(segment_ids) > 0, f"segment_ids list cannot be empty has length {len(segment_ids)}"
 
@@ -64,8 +64,12 @@ class InkLabelDataset(torch.utils.data.Dataset):
             # If the inklabels are 3D, we take the first slice
             inklabels = inklabels[:,:,0]
         
+        inklabels = inklabels/255
+        pergament = pergament/255
+        # map under 0.5 to 0 and over to 1
+        inklabels = (inklabels > 0.5).astype(np.float32)        
         
-        return {'inklabel': inklabels, 'scrollsegment': pergament, 'segment_id': segment_id}
+        return {'inklabel': inklabels, 'scroll_segment': pergament, 'segment_id': segment_id}
 
     def create_samples_from_data(self):
         with mp.Pool(mp.cpu_count()) as pool:
@@ -95,9 +99,8 @@ class InkLabelDataset(torch.utils.data.Dataset):
         return samples
     
     def check_sample(self, ink_label):
-        non_pixels = (ink_label > 100).sum().item()
         total_pixels = self.sample_size*self.sample_size
-        if non_pixels / total_pixels < self.upper_bound and non_pixels / total_pixels > self.lower_bound:
+        if np.sum(ink_label) / total_pixels < self.upper_bound and np.sum(ink_label) / total_pixels > self.lower_bound:
             return True
         return False
     
