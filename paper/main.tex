@@ -1,0 +1,331 @@
+% This is samplepaper.tex, a sample chapter demonstrating the
+% LLNCS macro package for Springer Computer Science proceedings;
+% Version 2.20 of 2017/10/04
+%
+
+\documentclass[runningheads]{llncs}
+%
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{mwe}
+\usepackage{subfig}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},https://www.instagram.com/dominikmayerart/
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+\usepackage{hyperref}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{babel}
+\usepackage{pgfplots}
+\usepackage{array}
+
+\pgfplotsset {compat = 1.18, width = 10cm}
+% Used for displaying a sample figure. If possible, figure files should
+% be included in EPS format.
+%
+% If you use the hyperref package, please uncomment the following line
+% to display URLs in blue roman font according to Springer's eBook style:
+\renewcommand\UrlFont{\color{blue}\rmfamily}
+
+\begin{document}
+%
+\title{Generating ink labels via conditional DDPM}
+\titlerunning{Ink labels with cDDPM}
+% If the paper title is too long for the running head, you can set
+% an abbreviated paper title here
+%
+\author{Popkov, Nikita}
+%
+% First names are abbreviated in the running head.
+% If there are more than two authors, 'et al.' is used.
+%
+\institute{University of Kassel, Germany \\
+\email{np@uni-kassel.de}}
+%
+\maketitle 
+\begin{abstract}
+The Vesuvius Challenge represents a groundbreaking initiative in digital archaeology, utilizing artificial intelligence to virtually unroll and read ancient carbonized Herculaneum papyri buried by Mount Vesuvius in 79 CE. This work presents a novel approach to ink detection in these severely damaged scrolls through the application of conditional Denoising Diffusion Probabilistic Models (DDPMs) trained on volumetric X-ray computed tomography (CT) data.
+%
+\keywords{Vesuvius  \and DDPM \and generative models \and conditional}
+\end{abstract}
+\section*{Introduction}
+\label{sec:Intro}
+The Herculaneum papyri, carbonized by the eruption of Mount Vesuvius in 79 CE, represent the only surviving library from antiquity, containing invaluable Greek and Latin texts. For centuries, the scrolls’ delicate, carbonized structure rendered physical unrolling an act of destruction, hindering access to their con\-tents. In recent years, major advances in imaging—most notably micro-CT (X-ray computed tomography)—have enabled the non-destructive acquisition of high-resolution 3D representations of rolled, fragile papyrus scrolls. This digital “virtual unrolling” provides a foundation for revealing text hidden deep within the scrolls without the risk inherent in traditional methods. However, a fun\-damental challenge remains: both the papyrus substrate and the ink used are carbon-based and thus nearly indistinguishable in X-ray images, making the text incredibly difficult to discern even with advanced imaging. Traditional digital restoration pipelines often rely on thresholding, manual annotation, or heuristic-driven segmentation, but these approaches frequently fail amid the severe deformation, faint signals, and ambiguous contrast in the scan data. As a result, efforts to read the scrolls are largely limited to rare, high-contrast regions or exposed surfaces. To overcome these constraints, recent work has shifted toward artificial intelligence, and particu\-larly machine learning, to recognize subtle patterns in the volumetric data indicative of ink presence. Methods such as convolutional neural networks, transformers, and tailored algorithms have been developed to process micro-CT volumes in search of hidden characters, enabling the identification and virtual repositioning of misplaced papyrus layers and the digital recovery of internal text structures. The Vesuvius Challenge, an international collaboration, has spurred further innovation by providing standar\-dized datasets and competitive incentives for reconstructing ink from micro-CT images with machine learning. This growing field seeks to combine volumetric imaging, advanced segmentation, and generative models to finally unlock the “invisible library” preserved in these ancient scrolls. Despite the promise of these approaches, no existing technique reliably reconstructs text from pure volumetric information alone, particularly when the signals are imperceptible to human annotators. The underlying problem thus centers on developing generative, data-driven models capable of learning the complex mapping from ambiguous CT signals to accurate ink label predictions, a task complicated by the scrolls’ degraded state, internal deformations, and the intrinsic similarity between papyrus and ink signatures in X-ray space. Overcoming this challenge would mark a substantial leap forward in digital restoration, enlisting cutting-edge AI to make ancient, unread texts accessible for the first time in two millennia.
+\subsection*{Related Work}
+\label{subsec:related work}
+\subsection*{Contribution}
+\label{subsec:contribution}
+We developed a conditional DDPM architecture specifically designed for volumetric ink reconstruction. The reconstruction is performed on patches of sections of the scrolls. Those patches have a specific quadratic size which can be adjusted. The model takes as input the patches corresponding volumetric information extracted from CT scans around papyrus surfaces and learns to generate binary ink labels through an iterative denoising process. Unlike traditional DDPMs that start from pure Gaussian noise, our conditional approach incorporates the volumetric CT data as conditioning information, allowing the model to learn the complex mapping between subtle density variations in the carbonized material and the presence of carbon-based ink. This work demonstrates the first application of conditional diffusion models to archaeological artifact reconstruction, specifically addressing the ink detection problem that has been a primary bottleneck in virtual unwrapping of the Herculaneum scrolls. The approach represents a novel approach over previous machine learning methods by leveraging the generative capabilities of diffusion models to reconstruct ink patterns from volumetric data alone, potentially enabling the reading of entire scrolls without requiring destructive physical unrolling.
+\section*{Methodology}
+\label{sec:methodology}
+In the field of image processing, ink detection also has roots. The main driver of the advances of the generative image model was the diffuse Diffusion Probabilistic Model (DDPM) \cite{ho_denoising_2020}. It did not only beat the until then state of the art models \cite{dhariwal_diffusion_2021} like Generative Adversarial Networks (GAN) but also opened a new field of improvements that rapidly followed after it's first appearance\cite{nichol_improved_2021}. Those achievements inspired the investigation of DDPMs for ink detection that are presented in this work. The following section describes some key prerequisites and methods used during the experiments and describes how DDPM is utilized for the solvency of the task.
+\subsection*{Dataset}
+\label{subsec:dataset}
+Our approach leverages the EduceLab-Scrolls dataset \cite{EduceLab}, which contains high-resolution volumetric X-ray micro-CT scans of both intact scrolls and detached fragments, along with aligned infrared spectral photography that provides ground truth ink labels. The dataset represents two decades of research effort and constitutes the largest multimodal imaging dataset released in the heritage domain. Each fragment provides paired volumetric CT data and corresponding binary ink labels derived from spectral imaging of exposed surfaces, enabling supervised learning for the challenging task of detecting "invisible" carbon ink in CT scans.
+\subsection*{Preprocessing}
+\label{subsec:preprocessing}
+The above-mentioned dataset is provided in scrolls that have different segments that correspond to a specific ID. A scroll segment contains volumetric data from CT scans as well as ink labels for some segments. The following figure \ref{fig:entire} shows the segment "20231210121321" which was the main subject of the later presented experiments.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\linewidth]{images/entire.png}
+    \caption{Entire ink label data of segment 20231210121321.}
+    \label{fig:entire}
+\end{figure}
+The shape of this entire segment is (15839, 12489). To reduce computational resources, the segment was cut into different quadratic data patches. The size of the quadratic patches is later introduced as sample\_size with values 8, 16, and 32. This slicing results in an abundance of purely black or purely white patches. We introduced a mask that checks for the ink ratio of each patch. If it is below 5\% or above 95\% we don't include the sample in our final training/test dataset. The following figure \ref{fig:patched} shows a zoomed in part of the segment that highlights which patches made it into the final dataset.
+\begin{figure}
+    \centering
+    \includegraphics[width=0.6\linewidth]{images/patched.png}
+    \caption{Ink labels with valid (green) and invalid (red) patches of size 32x32 - zoomed in at [2200:5600 , 2000:4600]}
+    \label{fig:patched}
+\end{figure}
+\subsection*{Model}
+\label{subsec:model}
+The underlying model architecture incorporates a classic DDPM which was modified to include volumetric information for each patch of scroll by concatenating it to the positionally encoded timestep which guides the DDPM through the noising/denoising process during training and sampling a simple CNN which is part of the architecture shapes the information into the right size and its parameters are also trained.
+\begin{figure}
+    \centering
+    \includegraphics[width=1\linewidth]{figs/cDDPM_vesuvius.drawio.png}
+    \caption{Custom DDPM architecture as a sketch.}
+    \label{fig:ddpm}
+\end{figure}
+The above figure can be formalized by the following functions using $t\in \{0,...,T\}$ step in the noising process and $x\in  \mathbb{R}^{d\times w \times h}$ as the scroll volume.
+\begin{equation*}
+    pos\_encoding: \mathbb{N}_{\geq0}\xrightarrow{}\mathbb{R}^{w\cdot h}
+\end{equation*}
+\begin{equation*}
+    conv: \mathbb{R}^{d\times w \times h} \xrightarrow{} \mathbb{R}^{w\cdot h}
+\end{equation*}
+\begin{equation*}
+    DDPM: \mathbb{R}^{2\cdot w\cdot h} \xrightarrow{} \mathbb{R}^{w\times h}
+\end{equation*}
+\subsection*{Pixel Score}
+\label{subsec:pixelscore}
+To get a better overview on the generative capabilities of the presented models a pixel-wise score is introduced. After training the model can tasked to generate a sample for a provided volumetric slice of scroll. The model then proceeds to sample a ink label that consists of floats. Then those are transformed into 0 to 255 integers. Then a threshold is applied that maps everything below 127 to 0 and everything above to 1. Ultimately, the real ink label is compared to the generated sample, and the pixel score can be derived by counting matches on both sides and dividing it through the number of overall pixel.
+
+\[
+    match(a,b) = 
+    \begin{cases}
+        0 & , \text{if a $\neq$ b} \\
+        1 & , else 
+    \end{cases}
+    \text{ with a,b}\in \{0,1\}
+\]
+
+\begin{equation*}
+    score_{pixel}(\overrightarrow{a},\overrightarrow{b}) = \frac{1}{N^2} \sum_{n=1}^{N}\sum_{m=1}^{N}match(a_{nm},b_{nm})
+    \text{ with }\overrightarrow{a},\overrightarrow{b}\in \{0,1\}^{N\times N}
+\end{equation*}
+
+\section*{Experiment}
+\label{sec:experiment}
+The experiments systematically explored the conditional DDPM model's effective\-ness in reconstructing ink labels from volumetric papyrus data. Multiple versions of the model were trained, all restricted to a single scroll segment (ID: "2023121\-0121321") to maintain consistency and control for dataset-specific variation. With nearly all DDPM hyperparameters fixed, the two variables under investi\-gation were the “sample size”—the spatial area of each ink label patch (8×8, 16×16, or 32×32 pixels)—and the “volume depth,” representing the number of sequential CT slices in the input (8, 16, or 32). Taking slices out of the original ink label of a section will ultimately lead to samples that contain no ink label information at all (consisting only of zeros) or cut outs of ink labels that are bigger then the given sample area (consisting only of ones). To prevent this from happening the patches are filtered after cut out. This filter simply checks how many pixels are non-zero and discards a sample if it is below set upper and lower thresholds. For the experiments a upper and lower threshold of 40\% and 60\% were chosen. Each experiment corresponded to one of nine unique combinations (sample area × volume depth). For each configuration, the trained model variant was tasked with generating batches of predicted ink labels in five separate runs to assess the generative process’s stability and repeatability. This repeated per-configuration sampling enabled robust statistical evaluation across the entire experiment matrix. The fidelity of each predicted batch was quantitatively assessed using the pixel score which was defined in section \ref{subsec:pixelscore}. This granular evaluation provides direct insight into pixel-wise reconstruction accuracy. By varying the patch size for input and output—as well as the depth of the volumetric scan data seen by the model—this experiment reveals how spatial scale and context resolution influence the performance of the generative model architecture. 
+\subsection*{Splitting train and test data}
+The used section was separated in two sections. One that was used for the training and one that was used for testing and validation. Figure \ref{fig:train test} shows the split and at what section of the scroll segment it was made.
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figs/train_test_split.png}
+    \caption{Train and test split of the scroll segment.}
+    \label{fig:train test}
+\end{figure}
+\subsection*{Sample ratios for different experimental configurations}
+Above sections presented the approach of filtering each ink sample by checking the pixel presence. Applying those filter for different sample sizes results in different numbers of samples that are included in training and test/validation datasets. The following tables shows an overall distribution of samples in general and how many end up in each of the datasets.
+\begin{table}[]
+    \centering
+    \caption{Number of ink labels across different sample sizes.}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline
+        sample size & overall number of labels & overall train labels & overall test labels\\
+        \hline
+         8&3110912&2352000&758912\\
+         16&777728&588000&189728\\
+         32&194432&147000&47432\\
+         \hline
+    \end{tabular}
+    
+    \label{tab:placeholder}
+\end{table}
+\begin{table}[]
+    \centering
+    \caption{Caption}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline
+        Lower/Upper bound & sample size & valid train labels (\% of train) & valid test labels (\% of test)  \\
+        \hline
+          &8&6991 (0.3\%)&1894 (0.25\%)\\
+         40\%-60\%&16&3586 (0.6\%)&962 (0.5\%)\\
+         &32&1871 (1.3\%)&471 (1\%)\\
+         \hline
+          &8&23331 (1\%)&6317 (0.8\%)\\
+         20\%-80\%&16&11354 (2\%)&3107 (1.6\%)\\
+         &32&5679 (3.8\%)&1563 (3.2\%)\\
+         \hline
+          &8&36875 (1.6\%)&10074 (1.3\%)\\
+         5\%-95\%&16&18910 (3.2\%)&5193 (2.7\%)\\
+         &32&9359 (6.3\%)&2556 (5.4\%)\\
+         \hline
+    \end{tabular}
+    
+    \label{tab:placeholder}
+\end{table}
+\subsection*{Fixed and changing hyperparameters}
+The model described in section \ref{subsec:model} comes with a variety of built in model specific variables as well as parameters linked to the training of machine learning models. Many of those parameters are fixed across the different experimental configurations and some layers of the model change in correspondence with the experiment. The following table \ref{table:params} shows these values.
+\begin{table}[!h]
+    \centering
+     \caption{Fixed hyperparameter during training/experimentation.}
+    \begin{tabular}{|m{5em}||m{20em}|m{5em}|}
+        \hline
+            Parameter name & role & value\\
+        \hline
+             T& Number of de-/noising steps of the DDPM & 1000\\
+             \hline
+             beta\_min & Lower bound of the added noise value for the noising process of the DDPM & 0.001\\
+             \hline
+             beta\_max & Upper bound of the added noise value for the noising process of the DDPM & 0.02\\
+             \hline
+             learning rate & Training learning rate that is handed to the optimizer function & 0.003\\
+             \hline
+             loss function & Loss function that was used during model training & MSE\\
+             \hline
+             optimizer & Optimizer that was used during model training & AdamW \\
+             \hline
+    \end{tabular}
+    \label{table:params}
+\end{table}
+\\ \noindent
+The code example below shows how the volume\_depth and sample\_size influence the model for the conv-layer. Similar changes can be also observed deeper down the model architecture.
+\begin{lstlisting}[language=Python]
+...
+self.conv = nn.Sequential(
+    nn.ConvTranspose2d(volume_depth,1,3,stride=1,padding=1),
+    nn.Flatten(),
+    nn.Linear(sample_size**2,256),
+    nn.GELU()
+)
+...
+\end{lstlisting}
+\textcolor{red}{}
+\section*{Evaluation}
+
+In this section we present an overview of the results for the different combinations of defined sample sizes, volume depths as well as bound ratios for pixel occurrence. 
+Mainly we focus on the normalized mean values of the pixel score as presented in tables \ref{table:4060}, \ref{table:2080} and \ref{table:0595}. Also a 3D visualization was created to show the results in a more readable way. This is seen in figure \ref{fig:results}
+\begin{figure}
+
+\begin{minipage}{.5\linewidth}
+\centering
+\subfloat[]{\label{main:a}\includegraphics[scale=.25]{figs/4060.png}}
+\end{minipage}%
+\begin{minipage}{.5\linewidth}
+\centering
+\subfloat[]{\label{main:b}\includegraphics[scale=.25]{figs/8020.png}}
+\end{minipage}\par\medskip
+\centering
+\subfloat[]{\label{main:c}\includegraphics[scale=.5]{figs/0595.png}}
+
+\caption{(a) 3D-plot of normalized mean scores for the 40-60\% bound. (b) 3D-plot of normalized mean scores for the 20-80\% bound. (c) 3D-plot of normalized mean scores for the 05-95\% bound. The red bars visualize the standard deviation for each scores point.}
+\label{fig:results}
+\end{figure}
+\label{sec:evaluation}
+\begin{table}[!h]
+    \centering
+    \caption{Table of normalized mean pixel scores for 40\%-60\% bound with standard deviation.}
+    \begin{tabular}{|m{15ex}||m{17ex}|m{17ex}|m{17ex}|}
+    \hline
+        $\frac{\text{sample area}}{\text{volume depth}}$ &8 &16&32\\
+    \hline
+    \hline
+         8&0.1531$\pm$0.1582&0.0991$\pm$0.066&0.1575$\pm$0.1262  \\
+         16&0.1234$\pm$0.1465&0.1564$\pm$0.1063&0.0704$\pm$0.0953 \\
+         32&0.1781$\pm$0.1536&0.1836$\pm$0.1439&0.005$\pm$0.0277 \\
+    \hline
+    \end{tabular}
+    
+    \label{table:4060}
+\end{table}
+\begin{table}[!h]
+    \centering
+    \caption{Table of normalized mean pixel scores for 20\%-80\% bound with standard deviation.}
+    \begin{tabular}{|m{15ex}||m{17ex}|m{17ex}|m{17ex}|}
+    \hline
+        $\frac{\text{sample area}}{\text{volume depth}}$ &8 &16&32\\
+    \hline
+    \hline
+         8&0.2046$\pm$0.1714&0.1294$\pm$0.1435&0.0845$\pm$0.1214  \\
+         16&0.1888$\pm$0.1616&0.1444$\pm$0.1301&0.2263$\pm$0.1779 \\
+         32&0.1132$\pm$0.1496&0.1092$\pm$0.1102&0.0750$\pm$0.1170 \\
+    \hline
+    \end{tabular}
+    
+    \label{table:2080}
+\end{table}
+\begin{table}[!h]
+    \centering
+    \caption{Table of normalized mean pixel scores for 05\%-95\% bound with standard deviation.}
+    \begin{tabular}{|m{15ex}||m{17ex}|m{17ex}|m{17ex}|}
+    \hline
+        $\frac{\text{sample area}}{\text{volume depth}}$ &8 &16&32\\
+    \hline
+    \hline
+         8&0.2022$\pm$0.2115&0.1646$\pm$0.2060&0.1326$\pm$0.1899  \\
+         16&0.1564$\pm$0.1576&0.1264$\pm$0.1811&0.2084$\pm$0.2469 \\
+         32&0.1032$\pm$0.1567&0.2727$\pm$0.2468&0.4119$\pm$0.1827 \\
+    \hline
+    \end{tabular}
+    
+    \label{table:0595}
+\end{table}
+The results suggest that the model was not able to learn any contextual information that links volumetric information to the corresponding ink label. The only model combination that scores above mean 50\% is for the bound 5\%-95\% for the samples size 32 and volume depth 32 and if the upside of the standard deviation is taken into account with $0.4119\pm0.1827$. The conclusion section \ref{sec:conclusion} will talk more about where this performance may come from. An additional investigation could be conducted by looking at the maximum values that each of models achieved, what was the best result the model could produce. This can be seen in figure \ref{fig:max result}
+\begin{figure}.
+
+\begin{minipage}{.5\linewidth}
+\centering
+\subfloat[]{\label{main:a}\includegraphics[scale=.25]{figs/4060max.png}}
+\end{minipage}%
+\begin{minipage}{.5\linewidth}
+\centering
+\subfloat[]{\label{main:b}\includegraphics[scale=.25]{figs/2080max.png}}
+\end{minipage}\par\medskip
+\centering
+\subfloat[]{\label{main:c}\includegraphics[scale=.5]{figs/0595max.png}}
+
+\caption{(a) 3D-plot of normalized max scores for the 40-60\% bound. (b) 3D-plot of normalized max scores for the 20-80\% bound. (c) 3D-plot of normalized max scores for the 05-95\% bound. The red bars visualize the standard deviation for each scores point.}
+\label{fig:max result}
+\end{figure}
+One finding is that the higher the bound ratio the higher the scores tend to be. The best max result was achieved in the bound of 5\%-95\% by the model with sample size 8 and the volume depth 32 with 93.75\%. We speculate that this was achieved by chance and that it is not a valid indicator that this combination of samples size and volume depth is particulary good.
+\newpage
+\section*{Conclusion}
+\label{sec:conclusion}
+Defining a conditional DDPM model that takes volumetric information as a condition to create ink labels was achieved. We created an implementation that was able to train on scroll data and is able to sample ink label data, but it is lacking performance. The theoretical capabilities to solve the given problem are achieved. Several factors can influence model performance. Representation of volumetric data is an impactful factor. Implementing a simple convolutional approach as we showed in section \ref{subsec:model} might be not enough to fully compress the context of scroll data.
+Due to high model complexity when working with DDPM and an increased need for resources we were limited to testing a maximum sample size of 32x32. Related approaches presented in the Vesuvius Challenge \cite{vesuvius} often use at least a sample size of 256x256. Also we limited the training data by looking at a specific scroll segment from the first scroll. We see our results as a novel approach exploration that might open the doors to a set of model architectures that could ultimately improve the result of ink detection efforts in the future.
+\subsection*{Future Work}
+The above mentioned limitations and problems could be addressed in different ways. First of all a study about representation of volumetric data could be conducted. We suggest to test an Autoencoder architecture that is trained on simply reconstructing the volumetric data. If successful the resulting encoder part could be utilized instead of the simple convolutional approach we showed.
+The pre-training process needs to be improved by incorporating more diverse samples that are scrapped from different scrolls and segment to create a more diverse training dataset.
+\section*{Declaration of Usage of AI Tools}
+I acknowledge the use of \href{https://www.perplexity.ai}{Perplexity} to enhance my literature research and to answer questions about papers as well as \href{https://www.writefull.com/}{Writefull} to improve writing style.
+\bibliographystyle{splncs04.bst}
+\bibliography{bibliography.bib}
+\end{document}
