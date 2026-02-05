@@ -10,21 +10,29 @@ import argparse
 import os
 from ml import matching_pixels, matching_pixels_subset_max
 import numpy as np
+
+SEED = 17
+np.random.seed(SEED)
+torch.manual_seed(SEED)
             
 parser  = argparse.ArgumentParser(description="Train a conditional DDPM model with ink labels.")
-parser.add_argument('--sample_size', type=int, default=32, help='Size of the samples to be used in training.')
-parser.add_argument('--volume_depth', type=int, default=8, help='Depth of the volume to be used in training.')
+parser.add_argument('--sample_size', type=int, default=8, help='Size of the samples to be used in training.')
+parser.add_argument('--volume_depth', type=int, default=32, help='Depth of the volume to be used in training.')
 parser.add_argument('--upper_bound', type=float, default=0.95, help='Upper bound for the ink label values.')
-parser.add_argument('--lower_bound', type=float, default=0.05, help='Lower bound for the ink label values.')
+parser.add_argument('--lower_bound', type=float, default=0.05 , help='Lower bound for the ink label values.')
 args = parser.parse_args()
 
 segment_ids = yaml.safe_load(open('../configs/segment_ids.yaml', 'r'))
 segments = [segment_ids['segment_ids']['segments'][0]]
 
 
-dataset = InkLabelDataset(segment_ids=segments,sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth)
-train, test, val = torch.utils.data.random_split(dataset, [0.8, 0.1, 0.1])
-train_Loader = torch.utils.data.DataLoader(train, batch_size=64, shuffle=True,num_workers=27)
+dataset = InkLabelDataset(segment_ids=segments,sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth, test=False)
+test_val = InkLabelDataset(segment_ids=segments,sample_size=args.sample_size,upper_bound=args.upper_bound, lower_bound=args.lower_bound, volume_depth=args.volume_depth, test=True)
+
+#TODO nicht random splitten oder mit selbem seed
+test, val = torch.utils.data.random_split(test_val, [0.7, 0.3])
+
+train_Loader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True,num_workers=27)
 test_Loader = torch.utils.data.DataLoader(test, batch_size=32, shuffle=True,num_workers=27)
 validation_Loader = torch.utils.data.DataLoader(val, batch_size=16, shuffle=False,num_workers=27)
 
@@ -42,7 +50,7 @@ ddpm = Diffusion(
 )
 
 trainer = lt.Trainer(max_epochs=500, accelerator="gpu", devices=1, callbacks=[lt.pytorch.callbacks.early_stopping.EarlyStopping(monitor="train_loss", patience=15, mode="min")])
-trainer.fit(ddpm, train_Loader, validation_Loader)
+#trainer.fit(ddpm, train_Loader, validation_Loader)
 
 # create directory and save the model
 # check for ./experiments and create it if it does not exist
@@ -54,7 +62,8 @@ folder_name = f'./experiments/condDDPM_{args.sample_size}_{args.volume_depth}_{a
 if not os.path.exists(folder_name):
     os.makedirs(folder_name)
 
-ddpm.save(os.path.join(folder_name, 'model.ckpt'))
+#ddpm.save(os.path.join(folder_name, 'model.ckpt'))
+ddpm.load(os.path.join(folder_name, 'model.ckpt'))
 
 test_sample = next(iter(test_Loader))
 idx = 3
@@ -65,7 +74,7 @@ test_results = ddpm.__test_after_training__(input_sample)
 plt.figure(figsize=(16, 4))
 for i in range(8):
     plt.subplot(3, 8, i + 1)
-    plt.imshow(test_sample['ink_label'][idx].cpu().numpy(), cmap='gray',vmin=0,vmax=255)
+    plt.imshow(test_sample['ink_label'][idx,:,:].cpu().numpy(), cmap='gray',vmin=0,vmax=255)
     plt.axis('off')
     plt.title("true label")
 
@@ -99,24 +108,52 @@ def multi_same_exp():
     with open(results_file, 'w') as f:
         yaml.dump(results, f)
 
-def entire_test_loader_exp():
+def checked_test_loader():
     num_runs = 5
     all_scores = {}
     for i in range(num_runs):
-        for test_sample in test_Loader:
+        for batch_numb,test_sample in enumerate(test_Loader):
             batch_scores = []
             input_sample = test_sample['scroll_segment'].float().cuda()
             samples = ddpm.__test_after_training__(input_sample)
             for j in range(input_sample.shape[0]):
                 matching_pixels_score = matching_pixels(samples[j].cpu().numpy(), test_sample['ink_label'].squeeze().cpu().numpy()[j])
                 batch_scores.append(matching_pixels_score.tolist())
-            all_scores['run_' + str(i) + '_batch_' + str(len(all_scores))] = batch_scores
-                
-        # save the results to a yaml file
-        results_file = os.path.join(folder_name, 'entire_test_loader_run_' + str(i) + '.yaml')
-        with open(results_file, 'w') as f:
-            yaml.dump(all_scores, f)
-            
-entire_test_loader_exp()
+            all_scores['run_' + str(i) + '_batch_' + str(batch_numb)] = batch_scores   
+            # save the results to a yaml file
+            results_file = os.path.join(folder_name, 'checked_test_loader_run_' + str(i) + '.yaml')
+            with open(results_file, 'a') as f:
+                yaml.dump(all_scores, f)
+            all_scores = {}
+
+def entire_dataset_loader():
+    dataset = InkLabelDataset(segment_ids=segments,sample_size=args.sample_size,upper_bound=1.0, lower_bound=0.0, volume_depth=args.volume_depth, test=True)
+    data_Loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False,num_workers=27)
+    all_scores = {}
+    for batch_numb,test_sample in enumerate(data_Loader):
+            batch_scores = []
+            input_sample = test_sample['scroll_segment'].float().cuda()
+            samples = ddpm.__test_after_training__(input_sample)
+            for j in range(input_sample.shape[0]):
+                matching_pixels_score = matching_pixels(samples[j].cpu().numpy(), test_sample['ink_label'].squeeze().cpu().numpy()[j])
+                batch_scores.append(matching_pixels_score.tolist())
+            all_scores['batch_' + str(batch_numb)] = batch_scores   
+            # save the results to a yaml file
+            results_file = os.path.join(folder_name, 'entire_test_dataset.yaml')
+            with open(results_file, 'a') as f:
+                yaml.dump(all_scores, f)
+            all_scores = {}
+        
+def post_experiment():
+    #checked_test_loader()
+    entire_dataset_loader()
+
+# release memory
+train_Loader = None
+validation_Loader = None
+dataset = None
+test_val = None
+
+post_experiment()
         
         
